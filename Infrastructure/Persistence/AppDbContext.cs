@@ -16,6 +16,7 @@ namespace Infrastructure.Persistence
         public DbSet<Address> Addresses => Set<Address>();
         public DbSet<Category> Categories => Set<Category>();
         public DbSet<Product> Products => Set<Product>();
+        public DbSet<ProductImage> ProductImages => Set<ProductImage>();
         public DbSet<Order> Orders => Set<Order>();
         public DbSet<OrderItem> OrderItems => Set<OrderItem>();
         public DbSet<Offer> Offers => Set<Offer>();
@@ -24,6 +25,7 @@ namespace Infrastructure.Persistence
         public DbSet<WishlistItem> WishlistItems => Set<WishlistItem>();
         public DbSet<Review> Reviews => Set<Review>();
         public DbSet<Payment> Payments => Set<Payment>();
+        public DbSet<UserToken> UserTokens => Set<UserToken>();
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

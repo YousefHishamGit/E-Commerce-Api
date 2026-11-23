@@ -18,6 +18,11 @@ namespace Infrastructure.Persistence.Configurations
                 .HasColumnType("decimal(18,2)")
                 .IsRequired();
 
+            builder.Property(o => o.SubTotal).HasColumnType("decimal(18,2)");
+            builder.Property(o => o.DiscountAmount).HasColumnType("decimal(18,2)");
+            builder.Property(o => o.ShippingCost).HasColumnType("decimal(18,2)");
+            builder.Property(o => o.TaxAmount).HasColumnType("decimal(18,2)");
+
             builder.Property(o => o.ShippingStreet)
                 .HasMaxLength(200)
                 .IsRequired();

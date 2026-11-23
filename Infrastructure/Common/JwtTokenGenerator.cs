@@ -21,7 +21,7 @@ namespace Infrastructure.Common
         public JwtTokenGenerator(IOptions<JwtSettings> jwtOpts) { 
             _jwtSettings = jwtOpts.Value;
         }
-        public string GenerateToken(User user)
+        public (string Token, DateTime ExpiresAt) GenerateToken(User user)
         {
             var claims = new List<Claim>
             {
@@ -42,7 +42,7 @@ namespace Infrastructure.Common
               expires: expiresAt,
               signingCredentials: credentials
             );
-            return new JwtSecurityTokenHandler().WriteToken(token);
+            return (new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
         }
     }
 }

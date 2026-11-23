@@ -41,7 +41,7 @@ namespace Application.Services
                 };
             }
 
-            var coupon = await _couponRepo.GetByCodeAsync(dto.Code.Trim());
+            var coupon = await _couponRepo.GetByCodeAsync(dto.Code.Trim().ToUpperInvariant());
             if (coupon is null)
             {
                 return new CouponValidationResultDto
@@ -142,7 +142,7 @@ namespace Application.Services
 
         public async Task<CouponDto> GetCouponByCodeAsync(string code, CancellationToken cancellationToken = default)
         {
-            var coupon = await _couponRepo.GetByCodeAsync(code.Trim());
+            var coupon = await _couponRepo.GetByCodeAsync(code.Trim().ToUpperInvariant());
             if (coupon is null)
                 throw new NotFoundException($"Coupon with code '{code}' was not found.");
 

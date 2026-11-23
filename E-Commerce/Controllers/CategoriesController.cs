@@ -1,6 +1,7 @@
 using Application.Contracts.Services;
 using Application.DTOs.Categories;
 using Application.DTOs.Common;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -42,6 +43,7 @@ namespace E_Commerce.Controllers
         /// <summary>
         /// Create a new category.
         /// </summary>
+        [Authorize(Roles = "Admin")]
         [HttpPost]
         [ProducesResponseType(typeof(ApiResponseDto<CategoryDto>), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponseDto<object?>), StatusCodes.Status400BadRequest)]
@@ -57,6 +59,7 @@ namespace E_Commerce.Controllers
         /// <summary>
         /// Update an existing category.
         /// </summary>
+        [Authorize(Roles = "Admin")]
         [HttpPut("{id:int}")]
         [ProducesResponseType(typeof(ApiResponseDto<CategoryDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponseDto<object?>), StatusCodes.Status404NotFound)]
@@ -69,6 +72,7 @@ namespace E_Commerce.Controllers
         /// <summary>
         /// Delete a category by its ID.
         /// </summary>
+        [Authorize(Roles = "Admin")]
         [HttpDelete("{id:int}")]
         [ProducesResponseType(typeof(ApiResponseDto<string>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponseDto<object?>), StatusCodes.Status400BadRequest)]

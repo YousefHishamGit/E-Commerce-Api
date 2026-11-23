@@ -20,6 +20,9 @@ namespace Domain.Entities
         public int UsedCount { get; set; } = 0;
         public bool IsActive { get; set; } = true;
 
+        // Optimistic concurrency token (prevents exceeding MaxUsage)
+        public byte[] RowVersion { get; set; } = null!;
+
         // Navigation
         public ICollection<Order> Orders { get; set; } = new List<Order>();
     }

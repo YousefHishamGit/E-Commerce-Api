@@ -58,3 +58,7 @@ Thumbs.db
 ehthumbs.db
 desktop.ini
 
+
+# Uploaded files (local storage)
+E-Commerce/wwwroot/uploads/*
+!E-Commerce/wwwroot/uploads/.gitkeep

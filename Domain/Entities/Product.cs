@@ -17,6 +17,9 @@ namespace Domain.Entities
         public double AverageRating { get; set; } = 0;
         public int ReviewsCount { get; set; } = 0;
 
+        // Optimistic concurrency token (prevents overselling stock)
+        public byte[] RowVersion { get; set; } = null!;
+
         // FK
         public int CategoryId { get; set; }
         public Category Category { get; set; } = null!;
@@ -25,5 +28,6 @@ namespace Domain.Entities
         public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
         public ICollection<WishlistItem> WishlistItems { get; set; } = new List<WishlistItem>();
         public ICollection<Review> Reviews { get; set; } = new List<Review>();
+        public ICollection<ProductImage> Images { get; set; } = new List<ProductImage>();
     }
 }

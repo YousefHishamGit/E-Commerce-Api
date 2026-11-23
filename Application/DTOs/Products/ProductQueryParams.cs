@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 namespace Application.DTOs.Products
 {
     public class ProductQueryParams
@@ -5,8 +6,10 @@ namespace Application.DTOs.Products
         private const int MaxPageSize = 50;
         private int _pageSize = 10;
 
+        [Range(1, int.MaxValue, ErrorMessage = "PageIndex must be at least 1.")]
         public int PageIndex { get; set; } = 1;
 
+        [Range(1, int.MaxValue, ErrorMessage = "PageSize must be at least 1.")]
         public int PageSize
         {
             get => _pageSize;

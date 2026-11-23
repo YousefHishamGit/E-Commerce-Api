@@ -1,5 +1,6 @@
 using Application.Contracts.Repository;
 using Application.Contracts.Services;
+using Application.Contracts.Services.Common;
 using Application.DTOs.Common;
 using Application.DTOs.Products;
 using Application.Exceptions;
@@ -17,11 +18,13 @@ namespace Application.Services
     {
         private readonly IUnitOfWork _uow;
         private readonly IMapper _mapper;
+        private readonly IFileStorage _storage;
 
-        public ProductService(IUnitOfWork uow, IMapper mapper)
+        public ProductService(IUnitOfWork uow, IMapper mapper, IFileStorage storage)
         {
             _uow = uow;
             _mapper = mapper;
+            _storage = storage;
         }
 
         public async Task<PaginatedResponseDto<ProductDto>> GetAllProductsAsync(ProductQueryParams queryParams)
@@ -105,12 +108,17 @@ namespace Application.Services
         public async Task DeleteProductAsync(int productId)
         {
             var repository = _uow.GetRepository<Product, int>();
-            var product = await repository.GetByIdAsync(productId);
+            var product = await repository.GetByIdAsync(productId, new ProductsWithCategorySpec(productId));
             if (product is null)
                 throw new NotFoundException($"Product with ID {productId} was not found.");
 
-            repository.Delete(product);
+            var imageUrls = product.Images.Select(i => i.Url).ToList();
+
+            repository.Delete(product);   // image rows are removed by cascade
             await _uow.SaveChangesAsync();
+
+            foreach (var url in imageUrls)
+                await _storage.DeleteAsync(url);
         }
 
         private static void ApplyOffersToDtos(IEnumerable<ProductDto> dtos, IEnumerable<Offer> activeOffers)

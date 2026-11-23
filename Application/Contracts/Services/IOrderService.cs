@@ -16,6 +16,9 @@ namespace Application.Contracts.Services
         Task<PaginatedResponseDto<OrderDto>> GetAllOrdersAsync(int pageIndex = 1, int pageSize = 10, CancellationToken cancellationToken = default);
         Task<OrderDto> UpdateOrderStatusAsync(Guid orderId, string newStatus, CancellationToken cancellationToken = default);
         Task<OrderDto> CancelOrderAsync(Guid orderId, CancellationToken cancellationToken = default);
+
+        /// <summary>Cancels online-payment orders left unpaid for too long and releases their stock/coupon. Returns how many.</summary>
+        Task<int> CancelExpiredUnpaidOrdersAsync(int olderThanMinutes, CancellationToken cancellationToken = default);
     }
 }
 

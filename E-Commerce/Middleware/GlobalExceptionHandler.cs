@@ -44,6 +44,16 @@ namespace E_Commerce.Middleware
                     conflict.Message,
                     null),
 
+                Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException => (
+                    (int)HttpStatusCode.Conflict,
+                    "The data was modified by another request (e.g. stock or coupon usage changed). Please retry.",
+                    null),
+
+                ServiceUnavailableException unavailable => (
+                    (int)HttpStatusCode.ServiceUnavailable,
+                    unavailable.Message,
+                    null),
+
                 UnauthorizedException unauthorized => (
                     (int)HttpStatusCode.Unauthorized,
                     unauthorized.Message,

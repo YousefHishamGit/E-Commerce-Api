@@ -16,6 +16,9 @@ namespace E_Commerce.Extensions
             services.AddScoped<ICacheRepository, CacheRepository>();
             services.AddScoped<IUserRepository, UserRepository>();
             services.AddScoped<ICouponRepository, CouponRepository>();
+            services.AddScoped<IDashboardRepository, DashboardRepository>();
+            services.AddScoped<IUserTokenRepository, UserTokenRepository>();
+            services.AddScoped<IPaymentRepository, PaymentRepository>();
 
             return services;
         }

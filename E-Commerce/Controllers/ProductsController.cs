@@ -1,6 +1,7 @@
 using Application.Contracts.Services;
 using Application.DTOs.Common;
 using Application.DTOs.Products;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace E_Commerce.Controllers
@@ -8,10 +9,12 @@ namespace E_Commerce.Controllers
     public class ProductsController : BaseApiController
     {
         private readonly IProductService _productService;
+        private readonly IProductImageService _imageService;
 
-        public ProductsController(IProductService productService)
+        public ProductsController(IProductService productService, IProductImageService imageService)
         {
             _productService = productService;
+            _imageService = imageService;
         }
 
         /// <summary>
@@ -41,6 +44,7 @@ namespace E_Commerce.Controllers
         /// <summary>
         /// Create a new product.
         /// </summary>
+        [Authorize(Roles = "Admin")]
         [HttpPost]
         [ProducesResponseType(typeof(ApiResponseDto<ProductDto>), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponseDto<object?>), StatusCodes.Status400BadRequest)]
@@ -56,6 +60,7 @@ namespace E_Commerce.Controllers
         /// <summary>
         /// Update an existing product.
         /// </summary>
+        [Authorize(Roles = "Admin")]
         [HttpPut("{id:int}")]
         [ProducesResponseType(typeof(ApiResponseDto<ProductDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponseDto<object?>), StatusCodes.Status404NotFound)]
@@ -66,8 +71,50 @@ namespace E_Commerce.Controllers
         }
 
         /// <summary>
+        /// Upload one or more images for a product (max 4 per product, JPG/PNG/WEBP, 5 MB each).
+        /// The first image (lowest free slot) is the main image.
+        /// </summary>
+        [Authorize(Roles = "Admin")]
+        [HttpPost("{id:int}/images")]
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(25 * 1024 * 1024)]
+        [RequestFormLimits(MultipartBodyLengthLimit = 25 * 1024 * 1024)]
+        [ProducesResponseType(typeof(ApiResponseDto<List<ProductImageDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponseDto<object?>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponseDto<object?>), StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<ApiResponseDto<List<ProductImageDto>>>> UploadImages(
+            int id, [FromForm] List<IFormFile> files, CancellationToken ct)
+        {
+            var uploads = files.Select(f => new ImageUploadDto { Content = f.OpenReadStream(), FileName = f.FileName }).ToList();
+            try
+            {
+                var images = await _imageService.AddImagesAsync(id, uploads, ct);
+                return Ok(ApiResponseDto<List<ProductImageDto>>.Ok(images, "Images uploaded successfully."));
+            }
+            finally
+            {
+                foreach (var u in uploads) await u.Content.DisposeAsync();
+            }
+        }
+
+        /// <summary>
+        /// Delete one image of a product.
+        /// </summary>
+        [Authorize(Roles = "Admin")]
+        [HttpDelete("{id:int}/images/{imageId:int}")]
+        [ProducesResponseType(typeof(ApiResponseDto<List<ProductImageDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponseDto<object?>), StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<ApiResponseDto<List<ProductImageDto>>>> DeleteImage(
+            int id, int imageId, CancellationToken ct)
+        {
+            var images = await _imageService.DeleteImageAsync(id, imageId, ct);
+            return Ok(ApiResponseDto<List<ProductImageDto>>.Ok(images, "Image deleted successfully."));
+        }
+
+        /// <summary>
         /// Delete a product by its ID.
         /// </summary>
+        [Authorize(Roles = "Admin")]
         [HttpDelete("{id:int}")]
         [ProducesResponseType(typeof(ApiResponseDto<string>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponseDto<object?>), StatusCodes.Status404NotFound)]

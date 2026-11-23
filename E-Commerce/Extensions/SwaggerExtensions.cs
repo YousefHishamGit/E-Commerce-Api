@@ -5,7 +5,8 @@ namespace E_Commerce.Extensions
     public static class SwaggerExtensions
     {
         public static IServiceCollection AddSwaggerServices(
-            this IServiceCollection services)
+            this IServiceCollection services,
+            IConfiguration configuration)
         {
             services.AddEndpointsApiExplorer();
 
@@ -52,11 +53,12 @@ namespace E_Commerce.Extensions
             });
 
             // CORS
+            var allowedOrigins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
             services.AddCors(options =>
             {
-                options.AddPolicy("AllowAll", policy =>
+                options.AddPolicy("AllowFrontend", policy =>
                 {
-                    policy.AllowAnyOrigin()
+                    policy.WithOrigins(allowedOrigins)
                           .AllowAnyMethod()
                           .AllowAnyHeader();
                 });

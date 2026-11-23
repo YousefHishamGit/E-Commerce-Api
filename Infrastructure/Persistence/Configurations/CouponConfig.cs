@@ -22,6 +22,8 @@ namespace Infrastructure.Persistence.Configurations
             builder.HasIndex(c => c.Code)
                 .IsUnique(); 
 
+            builder.Property(c => c.RowVersion).IsRowVersion();
+
             builder.Property(c => c.Type)
                 .IsRequired()
                 .HasConversion<string>(); 

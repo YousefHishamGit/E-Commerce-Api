@@ -14,6 +14,7 @@ namespace Application.Specifications
                 (!queryParams.MaxPrice.HasValue || p.Price <= queryParams.MaxPrice.Value))
         {
             AddInclude(p => p.Category);
+            AddInclude(p => p.Images);
 
             switch (queryParams.Sort?.Trim().ToLower())
             {
@@ -47,6 +48,7 @@ namespace Application.Specifications
             : base(p => p.Id == id)
         {
             AddInclude(p => p.Category);
+            AddInclude(p => p.Images);
         }
     }
 }

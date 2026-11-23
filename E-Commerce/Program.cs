@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using E_Commerce.Extensions;
 using E_Commerce.Middleware;
 using Infrastructure.Persistence;
@@ -18,9 +19,25 @@ namespace E_Commerce
             builder.Services.AddApplicationServices(builder.Configuration);
             builder.Services.AddMappingServices();
             builder.Services.AddJwtAuthentication(builder.Configuration);
-            builder.Services.AddSwaggerServices();
+            builder.Services.AddSwaggerServices(builder.Configuration);
+            builder.Services.AddAppRateLimiting(builder.Configuration);
 
-            builder.Services.AddControllers();
+            builder.Services.AddControllers()
+                .ConfigureApiBehaviorOptions(options =>
+                {
+                    // Return validation failures in the same envelope as every other error
+                    options.InvalidModelStateResponseFactory = context =>
+                    {
+                        var errors = context.ModelState
+                            .Where(e => e.Value?.Errors.Count > 0)
+                            .SelectMany(e => e.Value!.Errors.Select(x =>
+                                string.IsNullOrWhiteSpace(x.ErrorMessage) ? $"{e.Key} is invalid." : x.ErrorMessage))
+                            .ToList();
+
+                        return new BadRequestObjectResult(
+                            Application.DTOs.Common.ApiResponseDto<object?>.Fail("Validation failed.", 400, errors));
+                    };
+                });
 
             builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
             builder.Services.AddProblemDetails();
@@ -32,7 +49,10 @@ namespace E_Commerce
             app.UseExceptionHandler();
 
             // ── Auto-migrate & seed on startup ───────────────────────────────
-            await app.MigrateDatabaseAsync();
+            if (app.Environment.IsDevelopment())
+                await app.MigrateDatabaseAsync();
+
+            await app.SeedAdminAsync();
 
             // ── Middleware pipeline ──────────────────────────────────────────
             if (app.Environment.IsDevelopment())
@@ -48,8 +68,11 @@ namespace E_Commerce
             }
 
             app.UseHttpsRedirection();
+            app.UseStaticFiles();   // serves /uploads/*
 
-            app.UseCors("AllowAll");
+            app.UseCors("AllowFrontend");
+
+            app.UseRateLimiter();
 
             app.UseAuthentication();
             app.UseAuthorization();

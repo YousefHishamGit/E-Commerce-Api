@@ -29,6 +29,8 @@ namespace Infrastructure.Persistence.Configurations
             builder.Property(p => p.Description)
                 .HasMaxLength(1000);
 
+            builder.Property(p => p.RowVersion).IsRowVersion();
+
             builder.Property(p => p.StockQuantity)
                 .IsRequired();
             builder.Property(p => p.AverageRating)

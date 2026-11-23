@@ -6,6 +6,10 @@ namespace Application.DTOs.Orders
     {
         public Guid Id { get; set; }
         public string Status { get; set; } = null!;
+        public decimal SubTotal { get; set; }
+        public decimal DiscountAmount { get; set; }
+        public decimal ShippingCost { get; set; }
+        public decimal TaxAmount { get; set; }
         public decimal TotalPrice { get; set; }
         public int? CouponId { get; set; }
         public string? CouponCode { get; set; }

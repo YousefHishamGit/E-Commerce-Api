@@ -7,6 +7,7 @@ namespace Application.DTOs.Orders
         /// <summary>
         /// Optional: Redis basket key. If not provided, the authenticated user's basket is used automatically.
         /// </summary>
+        [StringLength(100)]
         public string? BasketId { get; set; }
 
         [Required(ErrorMessage = "DeliveryAddressId is required.")]
@@ -16,6 +17,7 @@ namespace Application.DTOs.Orders
         [Required(ErrorMessage = "PaymentMethod is required (e.g. CashOnDelivery, CreditCard, PayPal, Wallet).")]
         public string PaymentMethod { get; set; } = "CashOnDelivery";
 
+        [StringLength(50)]
         public string? CouponCode { get; set; }
     }
 }

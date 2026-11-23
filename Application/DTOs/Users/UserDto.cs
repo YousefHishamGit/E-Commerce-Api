@@ -10,6 +10,7 @@ namespace Application.DTOs.Users
         public string Email { get; set; } = null!;
         public string Gender { get; set; } = null!;
         public string Role { get; set; } = null!;
+        public bool EmailConfirmed { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 }

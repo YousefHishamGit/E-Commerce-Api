@@ -1,3 +1,4 @@
+using Application.Common;
 using Application.Contracts.Repository;
 using Application.Contracts.Services;
 using Application.Contracts.Services.Common;
@@ -22,14 +23,17 @@ namespace Application.Services
         private readonly ICouponRepository _couponRepo;
         private readonly IMapper _mapper;
         private readonly ICurrentUser _currentUser;
+        private readonly ShopSettings _shop;
 
         public BasketService(
             IBasketRepository basketRepo,
             IUnitOfWork uow,
             ICouponRepository couponRepo,
             ICurrentUser currentUser,
-            IMapper mapper)
+            IMapper mapper,
+            ShopSettings shop)
         {
+            _shop = shop;
             _basketRepo = basketRepo;
             _uow = uow;
             _couponRepo = couponRepo;
@@ -273,16 +277,15 @@ namespace Application.Services
             basket.CouponDiscount = discountAmount;
         }
 
-        private static void RecalculateTotals(CustomerBasket basket)
+        private void RecalculateTotals(CustomerBasket basket)
         {
-            var subtotal       = basket.Items.Sum(i => i.Price * i.Quantity);
-            var shipping       = basket.ShippingCost    ?? 0m;
-            var taxes          = basket.TaxesCost       ?? 0m;
-            var offerDiscount  = basket.OfferDiscount   ?? 0m;
-            var couponDiscount = basket.CouponDiscount  ?? 0m;
+            var subtotal = basket.Items.Sum(i => i.Price * i.Quantity);
+            var totals = PricingCalculator.Calculate(subtotal, basket.CouponDiscount ?? 0m, _shop);
 
-            var total = subtotal + shipping + taxes - offerDiscount - couponDiscount;
-            basket.TotalPrice = total < 0 ? 0 : total;
+            // Always overwrite: shipping/tax come from server rules, never from stored or client values
+            basket.ShippingCost = totals.Shipping;
+            basket.TaxesCost = totals.Tax;
+            basket.TotalPrice = totals.Total;
         }
     }
 }

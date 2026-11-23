@@ -10,8 +10,12 @@ namespace E_Commerce.Extensions
             this IServiceCollection services,
             IConfiguration configuration)
         {
-            var jwtKey = configuration["JWT:Key"]
-                ?? throw new InvalidOperationException("JWT:Key is not configured.");
+            var jwtKey = configuration["JWT:Secret"];
+            if (string.IsNullOrWhiteSpace(jwtKey))
+                throw new InvalidOperationException("JWT:Secret is not configured. Set it via user-secrets or environment variable JWT__Secret.");
+
+            if (jwtKey.Length < 32)
+                throw new InvalidOperationException("JWT:Secret must be at least 32 characters.");
 
             var issuer   = configuration["JWT:Issuer"];
             var audience = configuration["JWT:Audience"];
@@ -32,7 +36,7 @@ namespace E_Commerce.Extensions
                     ValidIssuer              = issuer,
                     ValidAudience            = audience,
                     IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-                    ClockSkew                = TimeSpan.FromMinutes(5) 
+                    ClockSkew                = TimeSpan.FromMinutes(1) 
                 };
 
                 // Return 401 JSON instead of redirect

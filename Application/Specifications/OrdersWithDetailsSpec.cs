@@ -1,3 +1,4 @@
+using Domain.Enums;
 using Domain.Entities;
 
 namespace Application.Specifications
@@ -45,6 +46,22 @@ namespace Application.Specifications
             AddInclude("OrderItems.Product");
             AddOrderByDescending(o => o.CreatedAt);
             ApplyPaging((pageIndex - 1) * pageSize, pageSize);
+        }
+    }
+
+    /// <summary>Online-payment orders that were never paid within the allowed window.</summary>
+    public class ExpiredUnpaidOrdersSpec : BaseSpecification<Order>
+    {
+        public ExpiredUnpaidOrdersSpec(DateTime cutoffUtc, int take)
+            : base(o => o.Status == OrderStatus.Pending
+                        && o.CreatedAt < cutoffUtc
+                        && o.Payments.Any(p => p.Method != PaymentMethod.CashOnDelivery)
+                        && !o.Payments.Any(p => p.Status == PaymentStatus.Completed))
+        {
+            AddInclude(o => o.Payments);
+            AddInclude(o => o.OrderItems);
+            AddOrderBy(o => o.CreatedAt);
+            ApplyPaging(0, take);
         }
     }
 

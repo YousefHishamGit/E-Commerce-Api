@@ -25,9 +25,15 @@ namespace Infrastructure.Repositories
             return await _context.Users.AnyAsync(u => u.Email == email); // email is case-sensitive
         }
 
+        public async Task<bool> PhoneExistsAsync(string phone, Guid? excludeUserId = null)
+        {
+            return await _context.Users.AnyAsync(u => u.Phone == phone && (excludeUserId == null || u.Id != excludeUserId));
+        }
+
         public async Task<User?> GetByEmailAsync(string email)
         {
-            return await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Email == email);
+            // Tracked on purpose: auth flows update lockout counters / password on this entity
+            return await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
         }
 
     }

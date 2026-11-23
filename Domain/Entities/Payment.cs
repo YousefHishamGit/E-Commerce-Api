@@ -19,6 +19,12 @@ namespace Domain.Entities
         // Transaction reference from gateway (Stripe / PayPal / etc.)
         public string? TransactionId { get; set; }
 
+        /// <summary>Our unique reference sent to the gateway for the current payment attempt (matches the webhook to this payment).</summary>
+        public string? GatewayReference { get; set; }
+
+        /// <summary>Gateway-side identifier of the payment session (intention).</summary>
+        public string? GatewayIntentionId { get; set; }
+
         // Last 4 digits / masked card number (never store full card!)
         public string? MaskedCardNumber { get; set; }
 

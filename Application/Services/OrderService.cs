@@ -1,3 +1,4 @@
+using Application.Common;
 using Application.Contracts.Repository;
 using Application.Contracts.Services;
 using Application.Contracts.Services.Common;
@@ -6,6 +7,7 @@ using Application.DTOs.Orders;
 using Application.Exceptions;
 using Application.Specifications;
 using AutoMapper;
+using Microsoft.Extensions.Logging;
 using Domain.Entities;
 using Domain.Enums;
 using System;
@@ -23,14 +25,26 @@ namespace Application.Services
         private readonly ICouponRepository _couponRepo;
         private readonly ICurrentUser _currentUser;
         private readonly IMapper _mapper;
+        private readonly ShopSettings _shop;
+        private readonly IEmailSender _email;
+        private readonly IPaymentService _payments;
+        private readonly ILogger<OrderService> _logger;
 
         public OrderService(
             IUnitOfWork uow,
             IBasketRepository basketRepo,
             ICouponRepository couponRepo,
             ICurrentUser currentUser,
-            IMapper mapper)
+            IMapper mapper,
+            ShopSettings shop,
+            IEmailSender email,
+            IPaymentService payments,
+            ILogger<OrderService> logger)
         {
+            _shop = shop;
+            _email = email;
+            _payments = payments;
+            _logger = logger;
             _uow = uow;
             _basketRepo = basketRepo;
             _couponRepo = couponRepo;
@@ -41,6 +55,12 @@ namespace Application.Services
         public async Task<OrderDto> CreateOrderAsync(CreateOrderDto dto, CancellationToken cancellationToken = default)
         {
             var userId = _currentUser.UserId;
+
+            // 0. Only customers with a confirmed email can place orders
+            var customer = await _uow.GetRepository<User, Guid>().GetByIdAsync(userId)
+                           ?? throw new NotFoundException("User was not found.");
+            if (!customer.EmailConfirmed)
+                throw new ForbiddenException("Please confirm your email address before placing an order.");
 
             // 1. Validate delivery address belongs to this user
             var addressSpec = new AddressesByUserSpec(dto.DeliveryAddressId, userId);
@@ -108,49 +128,39 @@ namespace Application.Services
 
             if (!string.IsNullOrWhiteSpace(couponCodeToApply))
             {
-                coupon = await _couponRepo.GetByCodeAsync(couponCodeToApply);
+                coupon = await _couponRepo.GetByCodeAsync(couponCodeToApply.Trim().ToUpperInvariant());
                 var now = DateTime.UtcNow;
 
-                if (coupon is not null && coupon.IsActive && coupon.StartDate <= now && coupon.EndDate >= now)
-                {
-                    if (!coupon.MaxUsage.HasValue || coupon.UsedCount < coupon.MaxUsage.Value)
-                    {
-                        var itemsSubtotal = orderItems.Sum(oi => oi.SubTotal);
-                        if (!coupon.MinOrderAmount.HasValue || itemsSubtotal >= coupon.MinOrderAmount.Value)
-                        {
-                            couponDiscountAmount = coupon.Type == CouponType.Percentage
-                                ? Math.Round((itemsSubtotal * coupon.Value) / 100m, 2)
-                                : Math.Min(coupon.Value, itemsSubtotal);
+                if (coupon is null)
+                    throw new BadRequestException($"Coupon '{couponCodeToApply}' was not found.");
+                if (!coupon.IsActive || coupon.StartDate > now || coupon.EndDate < now)
+                    throw new BadRequestException("This coupon is inactive or expired.");
+                if (coupon.MaxUsage.HasValue && coupon.UsedCount >= coupon.MaxUsage.Value)
+                    throw new BadRequestException("This coupon has reached its maximum usage limit.");
 
-                            coupon.UsedCount++;
-                            _couponRepo.Update(coupon);
-                        }
-                        else
-                        {
-                            // Coupon min-order not met — silently skip; don't block checkout
-                            coupon = null;
-                        }
-                    }
-                    else
-                    {
-                        coupon = null; // exhausted
-                    }
-                }
-                else
-                {
-                    coupon = null; // expired / inactive
-                }
+                var itemsSubtotal = orderItems.Sum(oi => oi.SubTotal);
+                if (coupon.MinOrderAmount.HasValue && itemsSubtotal < coupon.MinOrderAmount.Value)
+                    throw new BadRequestException($"Minimum order amount of {coupon.MinOrderAmount.Value:0.##} is required to apply this coupon.");
+
+                couponDiscountAmount = coupon.Type == CouponType.Percentage
+                    ? Math.Round((itemsSubtotal * coupon.Value) / 100m, 2)
+                    : Math.Min(coupon.Value, itemsSubtotal);
+
+                coupon.UsedCount++;
+                _couponRepo.Update(coupon);
             }
 
             // 6. Calculate totals
-            var subtotal = orderItems.Sum(oi => oi.SubTotal);
-            var shipping = basket.ShippingCost ?? 0m;
-            var taxes = basket.TaxesCost ?? 0m;
-            var totalPrice = Math.Max(0m, subtotal + shipping + taxes - couponDiscountAmount);
+            //    Shipping and taxes are computed here from server-side rules - never from the basket/client.
+            var totals = PricingCalculator.Calculate(orderItems.Sum(oi => oi.SubTotal), couponDiscountAmount, _shop);
+            var totalPrice = totals.Total;
 
-            // 7. Parse payment method
-            if (!Enum.TryParse<PaymentMethod>(dto.PaymentMethod, true, out var paymentMethod))
-                paymentMethod = PaymentMethod.CashOnDelivery;
+            // 7. Parse payment method (reject unknown values instead of silently defaulting)
+            if (!Enum.TryParse<PaymentMethod>(dto.PaymentMethod, true, out var paymentMethod)
+                || !Enum.IsDefined(paymentMethod))
+                throw new BadRequestException($"Invalid payment method '{dto.PaymentMethod}'. Allowed: CashOnDelivery, CreditCard, DebitCard, Wallet.");
+            if (paymentMethod == PaymentMethod.PayPal)
+                throw new BadRequestException("PayPal is not supported. Use CashOnDelivery, CreditCard, DebitCard or Wallet.");
 
             // 8. Persist Order with address snapshot
             var orderId = Guid.NewGuid();
@@ -159,6 +169,10 @@ namespace Application.Services
                 Id = orderId,
                 CustomerId = userId,
                 Status = OrderStatus.Pending,
+                SubTotal = totals.SubTotal,
+                DiscountAmount = totals.Discount,
+                ShippingCost = totals.Shipping,
+                TaxAmount = totals.Tax,
                 TotalPrice = totalPrice,
                 CouponId = coupon?.Id,
                 OrderItems = orderItems,
@@ -189,7 +203,20 @@ namespace Application.Services
             // 10. Return full order details
             var spec = new OrdersWithDetailsSpec(order.Id, userId);
             var createdOrders = await _uow.GetRepository<Order, Guid>().GetAllAsync(spec);
-            return _mapper.Map<OrderDto>(createdOrders.First());
+            var result = _mapper.Map<OrderDto>(createdOrders.First());
+
+            // 11. Confirmation email (best effort: a mail problem must never fail a placed order)
+            try
+            {
+                var (subject, html) = EmailTemplates.OrderConfirmation(customer.FirstName, result);
+                await _email.SendAsync(customer.Email, subject, html, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send confirmation email for order {OrderId}", result.Id);
+            }
+
+            return result;
         }
 
         public async Task<IEnumerable<OrderDto>> GetMyOrdersAsync(CancellationToken cancellationToken = default)
@@ -246,7 +273,8 @@ namespace Application.Services
                 throw new NotFoundException($"Order with ID {orderId} was not found.");
 
             // Restore inventory & revert coupon when cancelling
-            if (orderStatus == OrderStatus.Cancelled && order.Status != OrderStatus.Cancelled)
+            var cancelling = orderStatus == OrderStatus.Cancelled && order.Status != OrderStatus.Cancelled;
+            if (cancelling)
             {
                 await RestoreOrderInventoryAsync(order);
                 await RevertCouponUsageAsync(order);
@@ -255,6 +283,8 @@ namespace Application.Services
             order.Status = orderStatus;
             _uow.GetRepository<Order, Guid>().Update(order);
             await _uow.SaveChangesAsync();
+
+            if (cancelling) await RefundPaidOnlinePaymentsAsync(order, cancellationToken);
 
             var refreshedOrders = await _uow.GetRepository<Order, Guid>().GetAllAsync(spec);
             return _mapper.Map<OrderDto>(refreshedOrders.First());
@@ -290,8 +320,39 @@ namespace Application.Services
             _uow.GetRepository<Order, Guid>().Update(order);
             await _uow.SaveChangesAsync();
 
+            await RefundPaidOnlinePaymentsAsync(order, cancellationToken);
+
             var refreshedOrders = await _uow.GetRepository<Order, Guid>().GetAllAsync(spec);
             return _mapper.Map<OrderDto>(refreshedOrders.First());
+        }
+
+        public async Task<int> CancelExpiredUnpaidOrdersAsync(int olderThanMinutes, CancellationToken cancellationToken = default)
+        {
+            var cutoff = DateTime.UtcNow.AddMinutes(-olderThanMinutes);
+            var expired = (await _uow.GetRepository<Order, Guid>()
+                .GetAllAsync(new ExpiredUnpaidOrdersSpec(cutoff, take: 50))).ToList();
+
+            var repo = _uow.GetRepository<Order, Guid>();
+            foreach (var order in expired)
+            {
+                await RestoreOrderInventoryAsync(order);
+                await RevertCouponUsageAsync(order);
+
+                order.Status = OrderStatus.Cancelled;
+                order.UpdatedAt = DateTime.UtcNow;
+                repo.Update(order);
+                await _uow.SaveChangesAsync();
+
+                _logger.LogInformation("Order {OrderId} cancelled: online payment not completed within {Minutes} minutes.", order.Id, olderThanMinutes);
+            }
+            return expired.Count;
+        }
+
+        /// <summary>When a paid online order is cancelled the money must go back to the customer.</summary>
+        private async Task RefundPaidOnlinePaymentsAsync(Order order, CancellationToken ct)
+        {
+            foreach (var payment in order.Payments.Where(p => p.Status == PaymentStatus.Completed && p.Method.IsOnline()))
+                await _payments.TryRefundAsync(payment, ct);
         }
 
         private async Task RestoreOrderInventoryAsync(Order order)

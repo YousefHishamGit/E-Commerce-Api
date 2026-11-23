@@ -11,7 +11,9 @@ namespace Application.DTOs.Products
         public decimal? DiscountPercentage { get; set; }
         public string? OfferTitle { get; set; }
         public bool HasOffer => DiscountPercentage.HasValue && DiscountPercentage.Value > 0;
+        /// <summary>Main image (relative URL). Same as the first item of Images.</summary>
         public string? Photo { get; set; }
+        public List<ProductImageDto> Images { get; set; } = new();
         public string? Description { get; set; }
         public int StockQuantity { get; set; }
         public double AverageRating { get; set; }

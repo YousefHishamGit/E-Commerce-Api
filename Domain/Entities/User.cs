@@ -19,6 +19,11 @@ namespace Domain.Entities
         public string Email { get; set; }
         public string HashPassword { get; set; }
 
+        // Account security
+        public bool EmailConfirmed { get; set; }
+        public int FailedLoginAttempts { get; set; }
+        public DateTime? LockoutEnd { get; set; }
+
 
 
         // Navigation

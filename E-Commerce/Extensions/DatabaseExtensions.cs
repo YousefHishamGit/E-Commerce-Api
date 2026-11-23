@@ -42,7 +42,8 @@ namespace E_Commerce.Extensions
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "An error occurred while migrating the database: {Message}. Continuing startup...", ex.Message);
+                logger.LogError(ex, "An error occurred while migrating the database: {Message}", ex.Message);
+                throw;
             }
         }
     }

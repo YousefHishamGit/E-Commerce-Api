@@ -30,6 +30,12 @@ namespace Infrastructure.Persistence.Configurations
             builder.Property(p => p.TransactionId)
                 .HasMaxLength(100);
 
+            builder.Property(p => p.GatewayReference).HasMaxLength(64);
+            builder.Property(p => p.GatewayIntentionId).HasMaxLength(100);
+            builder.HasIndex(p => p.GatewayReference)
+                .IsUnique()
+                .HasFilter("[GatewayReference] IS NOT NULL");
+
             builder.Property(p => p.MaskedCardNumber)
                 .HasMaxLength(4);
 
